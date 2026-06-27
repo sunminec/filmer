@@ -151,12 +151,6 @@
     return h + '</span>';
   }
 
-  function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso + 'T00:00:00');
-    if (isNaN(d)) return iso;
-    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
   function escapeHTML(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -165,7 +159,7 @@
   /* ============================================================
      Navigation — simple screen stack
      ============================================================ */
-  const screen = { name: 'categories', categoryId: null, itemId: null, sort: 'date' };
+  const screen = { name: 'categories', categoryId: null, itemId: null, sort: 'rating' };
 
   const els = {
     title: document.getElementById('title'),
@@ -394,7 +388,7 @@
 
     const items = sortedItems(cat.items, screen.sort);
     if (!items.length) {
-      els.content.innerHTML = emptyState('🎬', 'Nothing here yet', 'Add your first entry with a rating, date and notes.');
+      els.content.innerHTML = emptyState('🎬', 'Nothing here yet', 'Add your first entry with a rating and notes.');
       return;
     }
 
@@ -404,7 +398,6 @@
         '<div class="row-title">' + escapeHTML(it.name) + '</div>' +
         '<div class="item-meta">' +
           '<span class="item-rating">' + it.rating + '/10' + miniStar() + '</span>' +
-          (it.watchDate ? '<span class="item-date">' + escapeHTML(fmtDate(it.watchDate)) + '</span>' : '') +
         '</div>' +
         chevron() +
       '</div>';
@@ -434,11 +427,6 @@
         '<div class="detail-stars">' + starsHTML(it.rating, 'lg') + '</div>' +
         '<div class="detail-rating-num">' + it.rating + ' / 10</div>' +
       '</div>';
-
-    h += '<div class="detail-block">' +
-      '<div class="detail-block-label">Watch date</div>' +
-      '<div class="detail-block-value">' + (it.watchDate ? escapeHTML(fmtDate(it.watchDate)) : '—') + '</div>' +
-    '</div>';
 
     h += '<div class="detail-block">' +
       '<div class="detail-block-label">Description</div>' +
@@ -477,15 +465,8 @@
   /* ---------- Sorting ---------- */
   function sortedItems(items, sort) {
     const arr = items.slice();
-    if (sort === 'rating') arr.sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
-    else if (sort === 'alpha') arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    else arr.sort((a, b) => { // date, newest first
-      const da = a.watchDate || '', db = b.watchDate || '';
-      if (da && db) return db.localeCompare(da);
-      if (da) return -1;
-      if (db) return 1;
-      return (b.createdAt || 0) - (a.createdAt || 0);
-    });
+    if (sort === 'alpha') arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    else arr.sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)); // rating, high→low
     return arr;
   }
 
@@ -537,7 +518,7 @@
   }
 
   /* ---- Sort dropdown ---- */
-  const SORT_OPTIONS = [['date', 'Date'], ['rating', 'Rating'], ['alpha', 'Name (A–Z)']];
+  const SORT_OPTIONS = [['rating', 'Rating'], ['alpha', 'Name (A–Z)']];
   function openSortMenu() {
     haptic('light');
     const rect = els.sortBtn.getBoundingClientRect();
@@ -605,7 +586,7 @@
   function openItemForm(cat, existing) {
     haptic('light');
     const isEdit = !!existing;
-    const data = existing || { name: '', rating: 0, watchDate: '', description: '' };
+    const data = existing || { name: '', rating: 0, description: '' };
     let rating = data.rating || 0;
 
     const overlay = buildOverlay(false);
@@ -621,10 +602,6 @@
           '<div class="field-label rating-label"><span>Rating</span>' +
             '<span class="rating-num"><b id="ratingVal">' + rating + '</b> / 10</span></div>' +
           '<div class="star-input-stars" id="starInput"></div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label class="field-label" for="itDate">Watch date</label>' +
-          '<input class="input" id="itDate" type="date" value="' + escapeHTML(data.watchDate || '') + '" />' +
         '</div>' +
         '<div class="field">' +
           '<label class="field-label" for="itDesc">Description</label>' +
@@ -677,7 +654,6 @@
       const payload = {
         name,
         rating,
-        watchDate: overlay.querySelector('#itDate').value || '',
         description: overlay.querySelector('#itDesc').value.trim(),
       };
       if (isEdit) {

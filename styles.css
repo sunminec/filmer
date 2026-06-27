@@ -340,7 +340,6 @@ body.modal-open { overflow: hidden; }
   color: var(--text);
 }
 .item-meta .item-rating svg { width: 15px; height: 15px; color: var(--star); }
-.item-meta .item-date { white-space: nowrap; }
 
 /* ---------- Stars ---------- */
 .stars { display: inline-flex; align-items: center; gap: 1px; }
