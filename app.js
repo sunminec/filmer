@@ -171,13 +171,25 @@
     title: document.getElementById('title'),
     back: document.getElementById('backBtn'),
     edit: document.getElementById('editBtn'),
-    addBtn: document.getElementById('addBtn'),
-    addLabel: document.getElementById('addLabel'),
-    sortBar: document.getElementById('sortBar'),
+    sortBtn: document.getElementById('sortBtn'),
+    fab: document.getElementById('fab'),
+    fabLabel: document.getElementById('fabLabel'),
     content: document.getElementById('content'),
   };
 
   let editMode = false; // category edit (delete) mode on the home screen
+  let navDir = 'none';  // 'forward' | 'back' | 'none' — drives screen transition
+
+  const PENCIL_SVG = '<svg viewBox="0 0 24 24"><path d="M4 20.5l4.2-1 9.1-9.1a1.8 1.8 0 0 0 0-2.6l-1.1-1.1a1.8 1.8 0 0 0-2.6 0L4.5 15.8l-1 4.7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M13.5 7.2l3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function userName() {
+    try {
+      const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (u) return u.first_name || u.username || 'there';
+    } catch (e) {}
+    return 'there';
+  }
 
   function syncTelegramBackButton() {
     const atRoot = screen.name === 'categories';
@@ -199,20 +211,30 @@
   }
   function goCategory(id) {
     editMode = false;
+    navDir = 'forward';
     screen.name = 'category';
     screen.categoryId = id;
     screen.itemId = null;
     render();
   }
   function goItem(id) {
+    navDir = 'forward';
     screen.name = 'item';
     screen.itemId = id;
     render();
   }
   function back() {
-    haptic('light');
-    if (screen.name === 'item') { screen.name = 'category'; screen.itemId = null; render(); }
-    else if (screen.name === 'category') goCategories();
+    if (screen.name === 'item') {
+      haptic('light');
+      navDir = 'back';
+      screen.name = 'category';
+      screen.itemId = null;
+      render();
+    } else if (screen.name === 'category') {
+      haptic('light');
+      navDir = 'back';
+      goCategories();
+    }
   }
 
   /* ============================================================
@@ -220,6 +242,9 @@
      ============================================================ */
   function render() {
     syncTelegramBackButton();
+    const cls = navDir === 'forward' ? 'nav-forward' : navDir === 'back' ? 'nav-back' : 'nav-fade';
+    els.content.className = 'content ' + cls; // set before innerHTML so fresh nodes animate
+    navDir = 'none';
     if (screen.name === 'categories') renderCategories();
     else if (screen.name === 'category') renderCategory();
     else if (screen.name === 'item') renderItem();
@@ -229,13 +254,13 @@
     const cats = state.categories;
     if (!cats.length) editMode = false; // nothing to edit
 
-    els.title.textContent = '';
-    els.sortBar.hidden = true;
-    els.addLabel.textContent = 'Add Section';
-    els.addBtn.hidden = editMode;            // hide "Add" while editing
+    els.title.textContent = 'Hi, ' + userName();
+    els.sortBtn.hidden = true;
+    els.fabLabel.textContent = 'Add Section';
+    els.fab.hidden = editMode;               // hide Add while editing
     els.edit.hidden = cats.length === 0;     // no Edit button when empty
-    els.edit.textContent = editMode ? 'Save' : 'Edit';
-    els.edit.classList.toggle('is-save', editMode);
+    els.edit.innerHTML = editMode ? CHECK_SVG : PENCIL_SVG;
+    els.edit.classList.toggle('active', editMode);
 
     if (!cats.length) {
       els.content.innerHTML = emptyState('🗂️', 'No sections yet', 'Tap “Add Section” to create your first list — Films, Books, anything.');
@@ -282,15 +307,10 @@
     if (!cat) return goCategories();
 
     els.title.textContent = cat.name;
-    els.addLabel.textContent = 'Add ' + cat.name;
-    els.addBtn.hidden = false;
+    els.fabLabel.textContent = 'Add ' + cat.name;
+    els.fab.hidden = false;
     els.edit.hidden = true;
-    els.sortBar.hidden = false;
-
-    // sort chips
-    els.sortBar.querySelectorAll('.sort-chip').forEach((chip) => {
-      chip.classList.toggle('active', chip.dataset.sort === screen.sort);
-    });
+    els.sortBtn.hidden = cat.items.length === 0; // nothing to sort when empty
 
     const items = sortedItems(cat.items, screen.sort);
     if (!items.length) {
@@ -329,9 +349,9 @@
     if (!it) return goCategory(cat.id);
 
     els.title.textContent = cat.name;
-    els.addBtn.hidden = true;
+    els.fab.hidden = true;
     els.edit.hidden = true;
-    els.sortBar.hidden = true;
+    els.sortBtn.hidden = true;
 
     let h = '<div class="detail">' +
       '<div class="detail-hero">' +
@@ -397,13 +417,50 @@
   const modalRoot = document.getElementById('modalRoot');
 
   function closeModal() {
-    modalRoot.innerHTML = '';
+    const overlay = modalRoot.querySelector('.modal-overlay');
+    if (!overlay) { modalRoot.innerHTML = ''; return; }
+    overlay.classList.add('closing');
+    setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 180);
   }
   function buildOverlay(center) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay' + (center ? ' center' : '');
     overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
     return overlay;
+  }
+  function checkIcon() {
+    return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  /* ---- Sort dropdown ---- */
+  const SORT_OPTIONS = [['date', 'Date'], ['rating', 'Rating'], ['alpha', 'Name (A–Z)']];
+  function openSortMenu() {
+    haptic('light');
+    const rect = els.sortBtn.getBoundingClientRect();
+    const overlay = document.createElement('div');
+    overlay.className = 'menu-overlay';
+    const menu = document.createElement('div');
+    menu.className = 'sort-menu';
+    menu.innerHTML = '<div class="sort-menu-label">Sort by</div>' +
+      SORT_OPTIONS.map(([k, label]) =>
+        '<button class="sort-item' + (screen.sort === k ? ' active' : '') + '" data-sort="' + k + '">' +
+          '<span>' + label + '</span><span class="check">' + checkIcon() + '</span>' +
+        '</button>').join('');
+    overlay.appendChild(menu);
+    modalRoot.appendChild(overlay);
+    // anchor under the sort button, right-aligned
+    menu.style.top = (rect.bottom + 6) + 'px';
+    menu.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    menu.querySelectorAll('.sort-item').forEach((b) => {
+      b.addEventListener('click', () => {
+        screen.sort = b.dataset.sort;
+        haptic('select');
+        overlay.remove();
+        navDir = 'none';
+        renderCategory();
+      });
+    });
   }
 
   /* ---- Add category (name only) ---- */
@@ -412,7 +469,6 @@
     const overlay = buildOverlay(false);
     overlay.innerHTML =
       '<div class="sheet" role="dialog">' +
-        '<div class="sheet-grabber"></div>' +
         '<h3 class="sheet-title">New Category</h3>' +
         '<div class="field">' +
           '<label class="field-label" for="catName">Name</label>' +
@@ -450,7 +506,6 @@
     const overlay = buildOverlay(false);
     overlay.innerHTML =
       '<div class="sheet" role="dialog">' +
-        '<div class="sheet-grabber"></div>' +
         '<h3 class="sheet-title">' + (isEdit ? 'Edit Entry' : 'New Entry') + '</h3>' +
         '<div class="field">' +
           '<label class="field-label" for="itName">Name</label>' +
@@ -458,11 +513,9 @@
           '<div class="field-error" id="itErr">Please enter a name.</div>' +
         '</div>' +
         '<div class="field">' +
-          '<label class="field-label">Rating</label>' +
-          '<div class="star-input">' +
-            '<div class="star-input-stars" id="starInput"></div>' +
-            '<div class="star-input-val"><span id="ratingVal">' + rating + '</span><span class="max"> / 10</span></div>' +
-          '</div>' +
+          '<div class="field-label rating-label"><span>Rating</span>' +
+            '<span class="rating-num"><b id="ratingVal">' + rating + '</b> / 10</span></div>' +
+          '<div class="star-input-stars" id="starInput"></div>' +
         '</div>' +
         '<div class="field">' +
           '<label class="field-label" for="itDate">Watch date</label>' +
@@ -590,22 +643,38 @@
   }
 
   function bindStaticUI() {
-    els.addBtn.addEventListener('click', onAdd);
+    els.fab.addEventListener('click', onAdd);
     els.back.addEventListener('click', back);
+    els.sortBtn.addEventListener('click', openSortMenu);
     els.edit.addEventListener('click', () => {
       if (screen.name !== 'categories') return;
       editMode = !editMode;
       haptic(editMode ? 'medium' : 'light');
+      navDir = 'none';
       renderCategories();
     });
-    els.sortBar.querySelectorAll('.sort-chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        screen.sort = chip.dataset.sort;
-        haptic('select');
-        renderCategory();
-      });
-    });
     if (canBackButton) { try { tg.BackButton.onClick(back); } catch (e) {} }
+    bindSwipeBack();
+  }
+
+  /* Swipe right to go back (mobile gesture). */
+  function bindSwipeBack() {
+    let sx = 0, sy = 0, tracking = false;
+    els.content.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1 || screen.name === 'categories') { tracking = false; return; }
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      tracking = true;
+    }, { passive: true });
+    els.content.addEventListener('touchend', (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx;
+      const dy = t.clientY - sy;
+      // mostly-horizontal right swipe, started anywhere in the content
+      if (dx > 70 && Math.abs(dy) < 50 && Math.abs(dx) > Math.abs(dy) * 1.6) back();
+    }, { passive: true });
   }
 
   /* ============================================================
