@@ -138,252 +138,6 @@
   }
 
   /* ============================================================
-     One-time bulk import — PRIVATE to a single Telegram account.
-     Runs once (guarded by a flag stored in that account's own
-     CloudStorage) and only for MY_TG_ID, so nobody else's data is
-     touched. Safe to delete this whole block after it has run.
-     ============================================================ */
-  const MY_TG_ID = 552097382; // private import — only this account
-  const IMPORT_ID = 'bulk-2026-06-27';
-  const IMPORT_DATE = '2026-06-27'; // today, per request
-  const IMPORT_GROUPS = [
-    { name: 'Фільми', icon: '🎬', raw: `Не дыши
-Пила
-Ван хелсинг
-Призрачний гонщик
-Знакомтесь Джо блек
-Мальчишник в Вегасе
-Проект Х
-Дежавю
-Веном
-Беславнные ублюдки
-Парфюмер
-Грань будущего
-Я робот
-Платформа
-Живая сталь
-Бетмен
-Список Шиндлера
-Джокер
-Еквилибриум
-Опенгеймер
-Игры разума
-Остров проклятых
-Интерсталер
-Великий уравнитель
-Побег из Шоушенка
-Законопослушний гражданин
-Пираты карибского моря
-Форд против Феррари
-Тупой еще тупее
-Екзамен
-Время
-Машинист
-Брюс всемогущий
-Шоу Трумана
-Никто не выжил
-Перелом
-Бойцовский клуб
-Семь
-Місія Кандагар
-Линкольн для адвоката
-Невидимый гость
-Пленници
-Престиж
-Крушение
-Идеальний шторм
-Дракула
-Игра в имитацию
-Дьявол в деталях
-Джанго освобожденний
-Зеленая книга
-Третий лишний
-На гребне волни
-Исцезнувшая
-Кошмар на улице В’язов
-Метод Хитча
-Я Легенда
-Мертвая тишина
-Милие кости
-Башня
-Зеленая мила
-Достать ножи
-Обдарованая
-Мег
-Аватар
-Финч
-Судная ночь
-Подмена
-Девушка из поезда
-Игра
-Тихое место
-Гладиатор
-Взаперти
-Не стучи дважди
-Крестний отец
-Шестое чуство
-Безлица
-Начало
-Хенкок
-Реквием по мечте
-Черний телефон
-Битва титанов
-Гнев титанов
-Области тьмы
-Стрингер
-Власть страха
-Падший
-Троя
-Отступники
-Востанние зловещих мертвецов
-Вышка
-Граф Монте Кристо
-Меч Короля Артура
-Мотылёк
-Темная башня
-Наркоз
-Золото
-Обливион
-Джон Уик
-Немыслемое
-Оленьи рога
-Эффект бабочки
-Аватар 2
-Всегда говори да
-Орудия
-1+1
-Формула 1` },
-    { name: 'Серіали', icon: '📺', raw: `Ходячие мертвецы
-Бойтесь ходячих мертвецов
-Побег
-Шерлок
-Бумажный дом
-Настоящий детектив
-Скорпион
-Игра в кальмара
-Люпен
-Джек ричер
-Во все тяжкие
-Северные воды
-Сквозь снег
-Очень странные дела
-Ганибал
-Сотня
-Чернобыль
-Игра престолов
-Бункер
-Извне
-Дом драконов
-Декстер
-Лучше звоните Солу
-Twin Peks
-Пингвин
-Кассандра
-Снегопад
-Lost
-Гангстерленд
-Ты
-Менталист
-День Шакала` },
-    { name: 'Ігри', icon: '🎮', raw: `Френ боу
-The Quorry
-Салли кромсали
-Athanasy
-Зайчик
-Until dawn
-The last of us
-Бесконечное лето
-Detroit Become Human` },
-    { name: 'Аніме', icon: '🎌', raw: `Обещанный неверленд
-Атака титанов
-Город в котором меня нет
-Доктор стоун
-Тетрадь смерти
-Кибербанк на грани
-Монстр
-Первый шаг
-Берсерк
-Аркейн
-7 смертных грехов
-Каслвания
-Клинок рассекающий демонов
-Solo leveling
-One punch men
-Магическая битва
-Токийский гуль` },
-    { name: 'Мультфільми', icon: '🧸', raw: `Ріо
-Тачки
-Геркулес
-Алладин
-Как приручить дракона
-Храброе сердце
-Время приключений
-Гравити фолз
-Плохие парни
-Суперсемейка
-Мадагаскар
-Гадкий Я
-Холодное сердце
-История игрушек
-Рапунцель
-Труп невесты
-Король лев
-Дев’ять
-Мегамозг
-Роботы
-Город героев` },
-  ];
-
-  function isMe() {
-    try {
-      const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
-      return !!u && u.id === MY_TG_ID;
-    } catch (e) { return false; }
-  }
-
-  // Map the default English seed categories onto the localized groups
-  // so we adopt them instead of creating duplicates.
-  function importAliasKey(name) {
-    const n = String(name || '').trim().toLowerCase();
-    if (n === 'films' || n === 'фильмы') return 'фільми';
-    if (n === 'series' || n === 'сериалы') return 'серіали';
-    if (n === 'games' || n === 'игры') return 'ігри';
-    return n;
-  }
-
-  // Returns true if it actually changed state (caller should persist).
-  function applyBulkImport() {
-    if (!isMe()) return false;
-    if (!state.imported) state.imported = {};
-    if (state.imported[IMPORT_ID]) return false;
-
-    for (const grp of IMPORT_GROUPS) {
-      const target = grp.name.toLowerCase();
-      let cat = state.categories.find((c) => importAliasKey(c.name) === target);
-      if (!cat) {
-        cat = { id: uid(), name: grp.name, icon: grp.icon, items: [] };
-        state.categories.push(cat);
-      } else if (!cat.items.length) {
-        cat.name = grp.name;   // adopt empty default seed → localized name/icon
-        cat.icon = grp.icon;
-      }
-      const seen = new Set(cat.items.map((i) => String(i.name).trim().toLowerCase()));
-      const titles = grp.raw.split('\n').map((s) => s.trim()).filter(Boolean);
-      for (const title of titles) {
-        const key = title.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        cat.items.push({
-          id: uid(), createdAt: Date.now(), name: title,
-          rating: 0, watchDate: IMPORT_DATE, description: '',
-        });
-      }
-    }
-    state.imported[IMPORT_ID] = true;
-    return true;
-  }
-
-  /* ============================================================
      Star rendering (0–10 scale, shown as 10 stars)
      ============================================================ */
   const STAR_PATH = 'M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.1 6.47L12 17.6l-5.8 3.05 1.1-6.47-4.7-4.58 6.5-.95z';
@@ -513,11 +267,12 @@ One punch men
       return;
     }
 
-    let h = '<div class="list">';
+    let h = '<div class="list' + (editMode ? ' editing' : '') + '">';
     for (const c of cats) {
       const n = c.items.length;
       if (editMode) {
-        h += '<div class="row cat-row editing">' +
+        h += '<div class="row cat-row editing" data-id="' + c.id + '">' +
+          '<span class="drag-handle" aria-label="Reorder">' + dragIcon() + '</span>' +
           '<div class="cat-icon">' + (c.icon || '🗂️') + '</div>' +
           '<div class="row-body"><div class="row-title">' + escapeHTML(c.name) + '</div></div>' +
           '<button class="cat-delete" data-del="' + c.id + '" aria-label="Delete">' + trashIcon() + '</button>' +
@@ -541,11 +296,90 @@ One punch men
           if (cat) confirmDeleteCategory(cat);
         });
       });
+      const listEl = els.content.querySelector('.list');
+      if (listEl) enableCatReorder(listEl);
     } else {
       els.content.querySelectorAll('[data-cat]').forEach((el) => {
         el.addEventListener('click', () => { haptic('light'); goCategory(el.dataset.cat); });
       });
     }
+  }
+
+  /* ---------- Drag-to-reorder sections (edit mode) ----------
+     Touch/pointer based: drag the ≡ handle to move a section. Other
+     rows shift to open a gap; on drop we commit the new order. */
+  function dragIcon() {
+    return '<svg viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  }
+
+  function enableCatReorder(listEl) {
+    const GAP = 10; // keep in sync with .list gap
+    let dragEl = null, handleEl = null, rows = [];
+    let fromIndex = -1, toIndex = -1, slot = 0, startY = 0;
+
+    function onDown(e) {
+      if (e.button != null && e.button !== 0) return;
+      const handle = e.target.closest('.drag-handle');
+      if (!handle || !listEl.contains(handle)) return;
+      const row = handle.closest('.cat-row');
+      if (!row) return;
+      e.preventDefault();
+      rows = Array.prototype.slice.call(listEl.querySelectorAll('.cat-row'));
+      fromIndex = rows.indexOf(row);
+      if (fromIndex < 0) return;
+      toIndex = fromIndex;
+      dragEl = row;
+      handleEl = handle;
+      slot = row.getBoundingClientRect().height + GAP;
+      startY = e.clientY;
+      row.classList.add('dragging');
+      haptic('select');
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    }
+
+    function onMove(e) {
+      if (!dragEl) return;
+      e.preventDefault();
+      const dy = e.clientY - startY;
+      dragEl.style.transform = 'translateY(' + dy + 'px)';
+      let idx = fromIndex + Math.round(dy / slot);
+      idx = Math.max(0, Math.min(rows.length - 1, idx));
+      if (idx === toIndex) return;
+      toIndex = idx;
+      haptic('light');
+      rows.forEach((el, i) => {
+        if (el === dragEl) return;
+        let shift = 0;
+        if (fromIndex < toIndex && i > fromIndex && i <= toIndex) shift = -slot;
+        else if (fromIndex > toIndex && i >= toIndex && i < fromIndex) shift = slot;
+        el.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    }
+
+    function onUp() {
+      if (!dragEl) return;
+      if (handleEl) {
+        handleEl.removeEventListener('pointermove', onMove);
+        handleEl.removeEventListener('pointerup', onUp);
+        handleEl.removeEventListener('pointercancel', onUp);
+      }
+      const from = fromIndex, to = toIndex;
+      dragEl = null; handleEl = null;
+      if (from !== to) {
+        const arr = state.categories;
+        const [moved] = arr.splice(from, 1);
+        arr.splice(to, 0, moved);
+        persist();
+        haptic('success');
+      }
+      renderCategories();
+    }
+
+    listEl.addEventListener('pointerdown', onDown);
   }
 
   function renderCategory() {
@@ -989,7 +823,6 @@ One punch men
         state = seed();
         persist();
       }
-      if (applyBulkImport()) persist();
       render();
     });
   }

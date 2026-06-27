@@ -233,6 +233,30 @@ body.modal-open { overflow: hidden; }
 .row:active { background: var(--card-press); transform: scale(0.99); }
 .row.editing:active { transform: none; background: var(--card); }
 
+/* edit-mode reorder: drag handle (≡) on the left + lifted state while dragging */
+.list.editing > .row { animation: none; }            /* no entrance stagger while editing */
+.cat-row.editing { transition: transform 0.18s ease, background 0.15s; }
+.cat-row.dragging {
+  transition: none;                                  /* follow the finger instantly */
+  z-index: 5;
+  background: var(--card-press);
+  box-shadow: 0 10px 24px rgba(16, 24, 28, 0.18);
+}
+.drag-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 34px;
+  margin: -6px 2px -6px -4px;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none;                                /* we own the vertical drag gesture */
+}
+.drag-handle:active { cursor: grabbing; color: var(--text-soft); }
+.drag-handle svg { width: 20px; height: 20px; }
+
 /* edit-mode delete control (red circle with trash) — sits at the right end */
 .cat-delete {
   flex-shrink: 0;
