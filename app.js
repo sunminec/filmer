@@ -429,6 +429,7 @@ One punch men
   let editMode = false; // category edit (delete) mode on the home screen
   let navDir = 'none';  // 'forward' | 'back' | 'none' — drives screen transition
   const listScroll = {}; // remembered scroll position of each category's item list
+  let itemQuery = '';    // live search query within a category's item list
   function pageScrollY() { return window.scrollY || document.documentElement.scrollTop || 0; }
 
   const PENCIL_SVG = '<svg viewBox="0 0 24 24"><path d="M4 20.5l4.2-1 9.1-9.1a1.8 1.8 0 0 0 0-2.6l-1.1-1.1a1.8 1.8 0 0 0-2.6 0L4.5 15.8l-1 4.7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M13.5 7.2l3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
@@ -462,6 +463,7 @@ One punch men
   }
   function goCategory(id) {
     editMode = false;
+    itemQuery = '';     // start each category with a clean search
     listScroll[id] = 0; // fresh entry from home starts at the top
     navDir = 'forward';
     screen.name = 'category';
@@ -656,13 +658,70 @@ One punch men
     els.edit.hidden = true;
     els.sortBtn.hidden = cat.items.length === 0; // nothing to sort when empty
 
-    const items = sortedItems(cat.items, screen.sort);
-    if (!items.length) {
+    if (!cat.items.length) {
       els.content.innerHTML = emptyState('🎬', 'Nothing here yet', 'Add your first entry with a rating and notes.');
       return;
     }
 
-    let h = '<div class="list">';
+    const showSearch = cat.items.length >= 6;
+    if (!showSearch) itemQuery = ''; // tiny list → no search box, drop stale query
+
+    let h = '';
+    if (showSearch) {
+      h += '<div class="search-wrap">' + searchIcon() +
+        '<input id="itemSearch" class="search-input" type="text" enterkeyhint="search" ' +
+        'autocomplete="off" autocorrect="off" placeholder="Search ' + escapeHTML(cat.name) + '…" ' +
+        'value="' + escapeHTML(itemQuery) + '" />' +
+        '<button id="searchClear" class="search-clear"' + (itemQuery ? '' : ' hidden') +
+        ' aria-label="Clear">' + clearIcon() + '</button>' +
+      '</div>';
+    }
+    h += '<div id="itemList" class="list"></div>';
+    els.content.innerHTML = h;
+
+    renderItemList(cat);
+
+    if (showSearch) {
+      const input = els.content.querySelector('#itemSearch');
+      const clearBtn = els.content.querySelector('#searchClear');
+      input.addEventListener('input', () => {
+        itemQuery = input.value;
+        clearBtn.hidden = !itemQuery;
+        renderItemList(cat);
+      });
+      // Return key just dismisses the keyboard
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+      clearBtn.addEventListener('click', () => {
+        itemQuery = '';
+        input.value = '';
+        clearBtn.hidden = true;
+        renderItemList(cat);
+        input.focus();
+      });
+    }
+
+    // restore the remembered scroll position (modal-locked renders are
+    // handled by the scroll lock itself, so skip those)
+    if (!scrollLocked) {
+      const y = listScroll[cat.id] || 0;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    }
+  }
+
+  // Render just the (optionally filtered) item rows into #itemList, so live
+  // search can refresh the list without rebuilding the input (keeps focus).
+  function renderItemList(cat) {
+    const listEl = document.getElementById('itemList');
+    if (!listEl) return;
+    const q = itemQuery.trim().toLowerCase();
+    let items = sortedItems(cat.items, screen.sort);
+    if (q) items = items.filter((it) => it.name.toLowerCase().indexOf(q) !== -1);
+
+    if (!items.length) {
+      listEl.innerHTML = '<div class="search-empty">Nothing found</div>';
+      return;
+    }
+    let h = '';
     for (const it of items) {
       h += '<div class="row item-row" data-item="' + it.id + '">' +
         '<div class="row-title">' + escapeHTML(it.name) + '</div>' +
@@ -672,19 +731,10 @@ One punch men
         chevron() +
       '</div>';
     }
-    h += '</div>';
-    els.content.innerHTML = h;
-
-    els.content.querySelectorAll('[data-item]').forEach((el) => {
+    listEl.innerHTML = h;
+    listEl.querySelectorAll('[data-item]').forEach((el) => {
       el.addEventListener('click', () => { haptic('light'); goItem(el.dataset.item); });
     });
-
-    // restore the remembered scroll position (modal-locked renders are
-    // handled by the scroll lock itself, so skip those)
-    if (!scrollLocked) {
-      const y = listScroll[cat.id] || 0;
-      requestAnimationFrame(() => window.scrollTo(0, y));
-    }
   }
 
   function renderItem() {
@@ -737,6 +787,15 @@ One punch men
   }
   function miniStar() {
     return '<svg viewBox="0 0 24 24"><path d="' + STAR_PATH + '" fill="currentColor"/></svg>';
+  }
+  function searchIcon() {
+    return '<svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.2-4.2"/></svg>';
+  }
+  function clearIcon() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
   }
 
   /* ---------- Sorting ---------- */
