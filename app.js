@@ -272,9 +272,9 @@
       const n = c.items.length;
       if (editMode) {
         h += '<div class="row cat-row editing">' +
-          '<button class="cat-delete" data-del="' + c.id + '" aria-label="Delete">' + trashIcon() + '</button>' +
           '<div class="cat-icon">' + (c.icon || '🗂️') + '</div>' +
           '<div class="row-body"><div class="row-title">' + escapeHTML(c.name) + '</div></div>' +
+          '<button class="cat-delete" data-del="' + c.id + '" aria-label="Delete">' + trashIcon() + '</button>' +
         '</div>';
       } else {
         h += '<div class="row cat-row" data-cat="' + c.id + '">' +
@@ -320,18 +320,13 @@
 
     let h = '<div class="list">';
     for (const it of items) {
-      const sub = [];
-      if (it.watchDate) sub.push(escapeHTML(fmtDate(it.watchDate)));
       h += '<div class="row item-row" data-item="' + it.id + '">' +
-        '<div class="row-body">' +
-          '<div class="row-title">' + escapeHTML(it.name) + '</div>' +
-          '<div class="row-sub">' +
-            '<span class="item-rating-inline">' + starsHTML(it.rating, 'sm') +
-              '<span class="num">' + it.rating + '</span></span>' +
-            (sub.length ? '<span>·</span><span>' + sub.join('') + '</span>' : '') +
-          '</div>' +
+        '<div class="row-title">' + escapeHTML(it.name) + '</div>' +
+        '<div class="item-meta">' +
+          '<span class="item-rating">' + it.rating + '/10' + miniStar() + '</span>' +
+          (it.watchDate ? '<span class="item-date">' + escapeHTML(fmtDate(it.watchDate)) + '</span>' : '') +
         '</div>' +
-        '<div class="row-meta">' + chevron() + '</div>' +
+        chevron() +
       '</div>';
     }
     h += '</div>';
@@ -395,6 +390,9 @@
       'M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6" ' +
       'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
+  function miniStar() {
+    return '<svg viewBox="0 0 24 24"><path d="' + STAR_PATH + '" fill="currentColor"/></svg>';
+  }
 
   /* ---------- Sorting ---------- */
   function sortedItems(items, sort) {
@@ -416,11 +414,37 @@
      ============================================================ */
   const modalRoot = document.getElementById('modalRoot');
 
+  /* ---- background scroll lock (freeze page while a modal/menu is open) ---- */
+  let scrollLockY = 0;
+  let scrollLocked = false;
+  function lockScroll() {
+    if (scrollLocked) return;
+    scrollLocked = true;
+    scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.style.top = (-scrollLockY) + 'px';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.classList.add('modal-open');
+  }
+  function unlockScroll() {
+    if (!scrollLocked) return;
+    scrollLocked = false;
+    document.body.classList.remove('modal-open');
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    window.scrollTo(0, scrollLockY);
+  }
+  function mountModal(overlay) {
+    modalRoot.appendChild(overlay);
+    lockScroll();
+  }
+
   function closeModal() {
     const overlay = modalRoot.querySelector('.modal-overlay');
-    if (!overlay) { modalRoot.innerHTML = ''; return; }
+    if (!overlay) { modalRoot.innerHTML = ''; unlockScroll(); return; }
     overlay.classList.add('closing');
-    setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 180);
+    setTimeout(() => { if (overlay.parentNode) overlay.remove(); unlockScroll(); }, 180);
   }
   function buildOverlay(center) {
     const overlay = document.createElement('div');
@@ -447,16 +471,17 @@
           '<span>' + label + '</span><span class="check">' + checkIcon() + '</span>' +
         '</button>').join('');
     overlay.appendChild(menu);
-    modalRoot.appendChild(overlay);
+    mountModal(overlay);
+    const closeSort = () => { if (overlay.parentNode) overlay.remove(); unlockScroll(); };
     // anchor under the sort button, right-aligned
     menu.style.top = (rect.bottom + 6) + 'px';
     menu.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeSort(); });
     menu.querySelectorAll('.sort-item').forEach((b) => {
       b.addEventListener('click', () => {
         screen.sort = b.dataset.sort;
         haptic('select');
-        overlay.remove();
+        closeSort();
         navDir = 'none';
         renderCategory();
       });
@@ -480,7 +505,7 @@
           '<button class="btn btn-primary" id="save">Create</button>' +
         '</div>' +
       '</div>';
-    modalRoot.appendChild(overlay);
+    mountModal(overlay);
     const input = overlay.querySelector('#catName');
     setTimeout(() => input.focus(), 60);
     overlay.querySelector('#cancel').addEventListener('click', closeModal);
@@ -530,7 +555,7 @@
           '<button class="btn btn-primary" id="save">' + (isEdit ? 'Save' : 'Add') + '</button>' +
         '</div>' +
       '</div>';
-    modalRoot.appendChild(overlay);
+    mountModal(overlay);
 
     const starBox = overlay.querySelector('#starInput');
     const ratingVal = overlay.querySelector('#ratingVal');
@@ -590,7 +615,7 @@
           '<button class="btn btn-danger" id="ok">Delete</button>' +
         '</div>' +
       '</div>';
-    modalRoot.appendChild(overlay);
+    mountModal(overlay);
     overlay.querySelector('#cancel').addEventListener('click', closeModal);
     overlay.querySelector('#ok').addEventListener('click', () => {
       const idx = cat.items.findIndex((x) => x.id === it.id);
@@ -619,7 +644,7 @@
           '<button class="btn btn-green" id="yes">Yes</button>' +
         '</div>' +
       '</div>';
-    modalRoot.appendChild(overlay);
+    mountModal(overlay);
     overlay.querySelector('#no').addEventListener('click', () => { haptic('light'); closeModal(); });
     overlay.querySelector('#yes').addEventListener('click', () => {
       const idx = state.categories.findIndex((c) => c.id === cat.id);

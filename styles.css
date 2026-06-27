@@ -36,6 +36,9 @@ input, textarea { font-family: inherit; }
 
 #app { min-height: 100%; display: flex; flex-direction: column; }
 
+/* scroll lock while a modal is open */
+body.modal-open { overflow: hidden; }
+
 /* ---------- Header ---------- */
 .app-header {
   position: sticky;
@@ -230,11 +233,11 @@ input, textarea { font-family: inherit; }
 .row:active { background: var(--card-press); transform: scale(0.99); }
 .row.editing:active { transform: none; background: var(--card); }
 
-/* edit-mode delete control (red circle with trash) */
+/* edit-mode delete control (red circle with trash) — sits at the right end */
 .cat-delete {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -245,7 +248,7 @@ input, textarea { font-family: inherit; }
   animation: deletePop 0.18s ease;
 }
 .cat-delete:active { transform: scale(0.88); }
-.cat-delete svg { width: 16px; height: 16px; }
+.cat-delete svg { width: 18px; height: 18px; }
 @keyframes deletePop { from { transform: scale(0); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .cat-icon {
@@ -295,10 +298,25 @@ input, textarea { font-family: inherit; }
 }
 .chevron { color: #c4cbd2; display: inline-flex; }
 
-/* item row variant */
-.item-row .row-title { margin-bottom: 4px; }
-.item-rating-inline { display: inline-flex; align-items: center; gap: 4px; }
-.item-rating-inline .num { font-weight: 600; color: var(--text); font-size: 13px; }
+/* item row variant — single line: name left, rating + date right */
+.item-row .row-title { flex: 1; min-width: 0; }
+.item-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+.item-meta .item-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  color: var(--text);
+}
+.item-meta .item-rating svg { width: 15px; height: 15px; color: var(--star); }
+.item-meta .item-date { white-space: nowrap; }
 
 /* ---------- Stars ---------- */
 .stars { display: inline-flex; align-items: center; gap: 1px; }
