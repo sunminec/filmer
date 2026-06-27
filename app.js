@@ -173,6 +173,8 @@
 
   let editMode = false; // category edit (delete) mode on the home screen
   let navDir = 'none';  // 'forward' | 'back' | 'none' — drives screen transition
+  const listScroll = {}; // remembered scroll position of each category's item list
+  function pageScrollY() { return window.scrollY || document.documentElement.scrollTop || 0; }
 
   const PENCIL_SVG = '<svg viewBox="0 0 24 24"><path d="M4 20.5l4.2-1 9.1-9.1a1.8 1.8 0 0 0 0-2.6l-1.1-1.1a1.8 1.8 0 0 0-2.6 0L4.5 15.8l-1 4.7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M13.5 7.2l3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
   const CHECK_SVG = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -205,6 +207,7 @@
   }
   function goCategory(id) {
     editMode = false;
+    listScroll[id] = 0; // fresh entry from home starts at the top
     navDir = 'forward';
     screen.name = 'category';
     screen.categoryId = id;
@@ -212,6 +215,8 @@
     render();
   }
   function goItem(id) {
+    // remember where we were in the list so we can return to the same spot
+    if (screen.name === 'category' && screen.categoryId) listScroll[screen.categoryId] = pageScrollY();
     navDir = 'forward';
     screen.name = 'item';
     screen.itemId = id;
@@ -408,6 +413,13 @@
     els.content.querySelectorAll('[data-item]').forEach((el) => {
       el.addEventListener('click', () => { haptic('light'); goItem(el.dataset.item); });
     });
+
+    // restore the remembered scroll position (modal-locked renders are
+    // handled by the scroll lock itself, so skip those)
+    if (!scrollLocked) {
+      const y = listScroll[cat.id] || 0;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    }
   }
 
   function renderItem() {
@@ -691,6 +703,7 @@
       haptic('success');
       closeModal();
       back(); // return to category list
+      scrollLockY = listScroll[cat.id] || 0; // let the unlock land us back where we were
     });
   }
 
