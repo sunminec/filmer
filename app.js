@@ -170,11 +170,14 @@
   const els = {
     title: document.getElementById('title'),
     back: document.getElementById('backBtn'),
+    edit: document.getElementById('editBtn'),
     addBtn: document.getElementById('addBtn'),
     addLabel: document.getElementById('addLabel'),
     sortBar: document.getElementById('sortBar'),
     content: document.getElementById('content'),
   };
+
+  let editMode = false; // category edit (delete) mode on the home screen
 
   function syncTelegramBackButton() {
     const atRoot = screen.name === 'categories';
@@ -195,6 +198,7 @@
     render();
   }
   function goCategory(id) {
+    editMode = false;
     screen.name = 'category';
     screen.categoryId = id;
     screen.itemId = null;
@@ -222,31 +226,55 @@
   }
 
   function renderCategories() {
-    els.title.textContent = 'Filmer';
-    els.addLabel.textContent = 'Add';
-    els.addBtn.hidden = false;
-    els.sortBar.hidden = true;
-
     const cats = state.categories;
+    if (!cats.length) editMode = false; // nothing to edit
+
+    els.title.textContent = '';
+    els.sortBar.hidden = true;
+    els.addLabel.textContent = 'Add Section';
+    els.addBtn.hidden = editMode;            // hide "Add" while editing
+    els.edit.hidden = cats.length === 0;     // no Edit button when empty
+    els.edit.textContent = editMode ? 'Save' : 'Edit';
+    els.edit.classList.toggle('is-save', editMode);
+
     if (!cats.length) {
-      els.content.innerHTML = emptyState('🗂️', 'No categories yet', 'Tap “Add” to create your first list — Films, Books, anything.');
+      els.content.innerHTML = emptyState('🗂️', 'No sections yet', 'Tap “Add Section” to create your first list — Films, Books, anything.');
       return;
     }
+
     let h = '<div class="list">';
     for (const c of cats) {
       const n = c.items.length;
-      h += '<div class="row" data-cat="' + c.id + '">' +
-        '<div class="cat-icon">' + (c.icon || '🗂️') + '</div>' +
-        '<div class="row-body"><div class="row-title">' + escapeHTML(c.name) + '</div></div>' +
-        '<div class="row-meta"><span class="count-pill">' + n + ' item' + (n === 1 ? '' : 's') + '</span>' +
-        chevron() + '</div></div>';
+      if (editMode) {
+        h += '<div class="row cat-row editing">' +
+          '<button class="cat-delete" data-del="' + c.id + '" aria-label="Delete">' + trashIcon() + '</button>' +
+          '<div class="cat-icon">' + (c.icon || '🗂️') + '</div>' +
+          '<div class="row-body"><div class="row-title">' + escapeHTML(c.name) + '</div></div>' +
+        '</div>';
+      } else {
+        h += '<div class="row cat-row" data-cat="' + c.id + '">' +
+          '<div class="cat-icon">' + (c.icon || '🗂️') + '</div>' +
+          '<div class="row-body"><div class="row-title">' + escapeHTML(c.name) + '</div></div>' +
+          '<div class="row-meta"><span class="count-pill">' + n + ' item' + (n === 1 ? '' : 's') + '</span>' +
+          chevron() + '</div></div>';
+      }
     }
     h += '</div>';
     els.content.innerHTML = h;
 
-    els.content.querySelectorAll('[data-cat]').forEach((el) => {
-      el.addEventListener('click', () => { haptic('light'); goCategory(el.dataset.cat); });
-    });
+    if (editMode) {
+      els.content.querySelectorAll('[data-del]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cat = getCategory(el.dataset.del);
+          if (cat) confirmDeleteCategory(cat);
+        });
+      });
+    } else {
+      els.content.querySelectorAll('[data-cat]').forEach((el) => {
+        el.addEventListener('click', () => { haptic('light'); goCategory(el.dataset.cat); });
+      });
+    }
   }
 
   function renderCategory() {
@@ -254,8 +282,9 @@
     if (!cat) return goCategories();
 
     els.title.textContent = cat.name;
-    els.addLabel.textContent = 'Add';
+    els.addLabel.textContent = 'Add ' + cat.name;
     els.addBtn.hidden = false;
+    els.edit.hidden = true;
     els.sortBar.hidden = false;
 
     // sort chips
@@ -301,6 +330,7 @@
 
     els.title.textContent = cat.name;
     els.addBtn.hidden = true;
+    els.edit.hidden = true;
     els.sortBar.hidden = true;
 
     let h = '<div class="detail">' +
@@ -339,6 +369,11 @@
     return '<span class="chevron"><svg viewBox="0 0 24 24" width="18" height="18">' +
       '<path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" ' +
       'stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+  }
+  function trashIcon() {
+    return '<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2' +
+      'M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6" ' +
+      'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
   /* ---------- Sorting ---------- */
@@ -514,6 +549,35 @@
     });
   }
 
+  /* ---- Confirm delete category ---- */
+  function confirmDeleteCategory(cat) {
+    haptic('warning');
+    const n = cat.items.length;
+    const note = n
+      ? 'This will also remove ' + n + ' item' + (n === 1 ? '' : 's') + ' inside.'
+      : '';
+    const overlay = buildOverlay(true);
+    overlay.innerHTML =
+      '<div class="confirm" role="dialog">' +
+        '<div class="confirm-title">Delete section?</div>' +
+        '<div class="confirm-text">Are you sure you want to delete “' + escapeHTML(cat.name) + '”? ' + note + '</div>' +
+        '<div class="confirm-actions">' +
+          '<button class="btn btn-red" id="no">No</button>' +
+          '<button class="btn btn-green" id="yes">Yes</button>' +
+        '</div>' +
+      '</div>';
+    modalRoot.appendChild(overlay);
+    overlay.querySelector('#no').addEventListener('click', () => { haptic('light'); closeModal(); });
+    overlay.querySelector('#yes').addEventListener('click', () => {
+      const idx = state.categories.findIndex((c) => c.id === cat.id);
+      if (idx >= 0) state.categories.splice(idx, 1);
+      persist();
+      haptic('success');
+      closeModal();
+      renderCategories(); // stay in edit mode
+    });
+  }
+
   /* ============================================================
      Wiring
      ============================================================ */
@@ -528,6 +592,12 @@
   function bindStaticUI() {
     els.addBtn.addEventListener('click', onAdd);
     els.back.addEventListener('click', back);
+    els.edit.addEventListener('click', () => {
+      if (screen.name !== 'categories') return;
+      editMode = !editMode;
+      haptic(editMode ? 'medium' : 'light');
+      renderCategories();
+    });
     els.sortBar.querySelectorAll('.sort-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
         screen.sort = chip.dataset.sort;

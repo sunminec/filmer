@@ -84,9 +84,22 @@ input, textarea { font-family: inherit; }
   color: #fff;
   font-size: 15px;
   font-weight: 600;
+  white-space: nowrap;
   transition: background 0.15s, transform 0.1s;
 }
 .add-btn:active { background: var(--accent-press); transform: scale(0.96); }
+.text-btn {
+  height: 34px;
+  padding: 0 8px;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 9px;
+  white-space: nowrap;
+  transition: background 0.15s, transform 0.1s;
+}
+.text-btn.is-save { font-weight: 700; }
+.text-btn:active { background: var(--card-press); transform: scale(0.96); }
 
 /* ---------- Sort bar ---------- */
 .sort-bar {
@@ -134,6 +147,25 @@ input, textarea { font-family: inherit; }
   transition: background 0.15s, transform 0.08s;
 }
 .row:active { background: var(--card-press); transform: scale(0.99); }
+.row.editing:active { transform: none; background: var(--card); }
+
+/* edit-mode delete control (red circle with trash) */
+.cat-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(229, 72, 77, 0.4);
+  animation: deletePop 0.18s ease;
+}
+.cat-delete:active { transform: scale(0.88); }
+.cat-delete svg { width: 16px; height: 16px; }
+@keyframes deletePop { from { transform: scale(0); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .cat-icon {
   flex-shrink: 0;
@@ -256,6 +288,10 @@ input, textarea { font-family: inherit; }
 .btn-danger { background: #fdecec; color: var(--danger); }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:active { background: var(--accent-press); }
+.btn-green { background: #34c759; color: #fff; }
+.btn-green:active { background: #2ba84a; }
+.btn-red { background: var(--danger); color: #fff; }
+.btn-red:active { background: #c93a3f; }
 
 /* ---------- Modal / sheet ---------- */
 .modal-overlay {
