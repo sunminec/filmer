@@ -159,7 +159,7 @@
   /* ============================================================
      Navigation — simple screen stack
      ============================================================ */
-  const screen = { name: 'categories', categoryId: null, itemId: null, sort: 'rating' };
+  const screen = { name: 'categories', categoryId: null, itemId: null, sort: 'added' };
 
   const els = {
     title: document.getElementById('title'),
@@ -465,8 +465,9 @@
   /* ---------- Sorting ---------- */
   function sortedItems(items, sort) {
     const arr = items.slice();
-    if (sort === 'alpha') arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    else arr.sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)); // rating, high→low
+    if (sort === 'rating') arr.sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name));
+    else if (sort === 'alpha') arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    else arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); // added: oldest first, newest last
     return arr;
   }
 
@@ -518,7 +519,7 @@
   }
 
   /* ---- Sort dropdown ---- */
-  const SORT_OPTIONS = [['rating', 'Rating'], ['alpha', 'Name (A–Z)']];
+  const SORT_OPTIONS = [['added', 'Date added'], ['rating', 'Rating'], ['alpha', 'Name (A–Z)']];
   function openSortMenu() {
     haptic('light');
     const rect = els.sortBtn.getBoundingClientRect();
