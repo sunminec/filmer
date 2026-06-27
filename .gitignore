@@ -1,0 +1,13 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# Local test artifacts
+_*.cjs
+_*.mjs
+_shot*.png
+node_modules/
