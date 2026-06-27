@@ -274,7 +274,10 @@
           '<span class="drag-handle" aria-label="Reorder">' + dragIcon() + '</span>' +
           '<div class="cat-icon">' + (c.icon || '🗂️') + '</div>' +
           '<div class="row-body"><div class="row-title">' + escapeHTML(c.name) + '</div></div>' +
-          '<button class="cat-delete" data-del="' + c.id + '" aria-label="Delete">' + trashIcon() + '</button>' +
+          '<div class="cat-actions">' +
+            '<button class="cat-rename" data-rename="' + c.id + '" aria-label="Rename">' + PENCIL_SVG + '</button>' +
+            '<button class="cat-delete" data-del="' + c.id + '" aria-label="Delete">' + trashIcon() + '</button>' +
+          '</div>' +
         '</div>';
       } else {
         h += '<div class="row cat-row" data-cat="' + c.id + '">' +
@@ -288,6 +291,13 @@
     els.content.innerHTML = h;
 
     if (editMode) {
+      els.content.querySelectorAll('[data-rename]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cat = getCategory(el.dataset.rename);
+          if (cat) openCategoryForm(cat);
+        });
+      });
       els.content.querySelectorAll('[data-del]').forEach((el) => {
         el.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -563,20 +573,21 @@
   }
 
   /* ---- Add category (name only) ---- */
-  function openCategoryForm() {
+  function openCategoryForm(existing) {
     haptic('light');
+    const isEdit = !!existing;
     const overlay = buildOverlay(false);
     overlay.innerHTML =
       '<div class="sheet" role="dialog">' +
-        '<h3 class="sheet-title">New Category</h3>' +
+        '<h3 class="sheet-title">' + (isEdit ? 'Rename Section' : 'New Category') + '</h3>' +
         '<div class="field">' +
           '<label class="field-label" for="catName">Name</label>' +
-          '<input class="input" id="catName" type="text" placeholder="e.g. Books" maxlength="40" autocomplete="off" enterkeyhint="done" />' +
+          '<input class="input" id="catName" type="text" placeholder="e.g. Books" maxlength="40" autocomplete="off" enterkeyhint="done" value="' + (isEdit ? escapeHTML(existing.name) : '') + '" />' +
           '<div class="field-error" id="catErr">Please enter a name.</div>' +
         '</div>' +
         '<div class="sheet-actions">' +
           '<button class="btn btn-secondary" id="cancel">Cancel</button>' +
-          '<button class="btn btn-primary" id="save">Create</button>' +
+          '<button class="btn btn-primary" id="save">' + (isEdit ? 'Save' : 'Create') + '</button>' +
         '</div>' +
       '</div>';
     mountModal(overlay);
@@ -586,11 +597,16 @@
     overlay.querySelector('#save').addEventListener('click', () => {
       const name = input.value.trim();
       if (!name) { overlay.querySelector('#catErr').classList.add('show'); haptic('warning'); return; }
-      state.categories.push({ id: uid(), name, icon: guessIcon(name), items: [] });
+      if (isEdit) {
+        existing.name = name; // keep the existing icon
+      } else {
+        state.categories.push({ id: uid(), name, icon: guessIcon(name), items: [] });
+      }
       persist();
       haptic('success');
       closeModal();
-      render();
+      if (isEdit) renderCategories(); // stay in edit mode
+      else render();
     });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') overlay.querySelector('#save').click(); });
   }
