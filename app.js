@@ -497,7 +497,7 @@
         '<h3 class="sheet-title">New Category</h3>' +
         '<div class="field">' +
           '<label class="field-label" for="catName">Name</label>' +
-          '<input class="input" id="catName" type="text" placeholder="e.g. Books" maxlength="40" autocomplete="off" />' +
+          '<input class="input" id="catName" type="text" placeholder="e.g. Books" maxlength="40" autocomplete="off" enterkeyhint="done" />' +
           '<div class="field-error" id="catErr">Please enter a name.</div>' +
         '</div>' +
         '<div class="sheet-actions">' +
@@ -534,7 +534,7 @@
         '<h3 class="sheet-title">' + (isEdit ? 'Edit Entry' : 'New Entry') + '</h3>' +
         '<div class="field">' +
           '<label class="field-label" for="itName">Name</label>' +
-          '<input class="input" id="itName" type="text" placeholder="Title" maxlength="120" autocomplete="off" value="' + escapeHTML(data.name) + '" />' +
+          '<input class="input" id="itName" type="text" placeholder="Title" maxlength="120" autocomplete="off" enterkeyhint="done" value="' + escapeHTML(data.name) + '" />' +
           '<div class="field-error" id="itErr">Please enter a name.</div>' +
         '</div>' +
         '<div class="field">' +
@@ -548,7 +548,7 @@
         '</div>' +
         '<div class="field">' +
           '<label class="field-label" for="itDesc">Description</label>' +
-          '<textarea class="textarea" id="itDesc" placeholder="Notes, thoughts, review…" maxlength="2000">' + escapeHTML(data.description || '') + '</textarea>' +
+          '<textarea class="textarea" id="itDesc" placeholder="Notes, thoughts, review…" maxlength="2000" enterkeyhint="done">' + escapeHTML(data.description || '') + '</textarea>' +
         '</div>' +
         '<div class="sheet-actions">' +
           '<button class="btn btn-secondary" id="cancel">Cancel</button>' +
@@ -580,6 +580,16 @@
 
     const nameInput = overlay.querySelector('#itName');
     if (!isEdit) setTimeout(() => nameInput.focus(), 60);
+
+    // Return key dismisses the keyboard instead of inserting a newline.
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); nameInput.blur(); }
+    });
+    const descInput = overlay.querySelector('#itDesc');
+    descInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); descInput.blur(); }
+    });
+
     overlay.querySelector('#cancel').addEventListener('click', closeModal);
     overlay.querySelector('#save').addEventListener('click', () => {
       const name = nameInput.value.trim();
