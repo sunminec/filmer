@@ -40,6 +40,10 @@
      localStorage fallback. Data is chunked to respect CloudStorage's
      ~4 KB per-value limit.
      ============================================================ */
+  // Cloud is only written once we've SAFELY read it (or confirmed it's
+  // empty). This prevents a transient read failure from overwriting real
+  // cloud data with a fresh seed.
+  let cloudReady = false;
   const Storage = {
     LS_KEY: 'filmer.data.v1',
     CLOUD_PREFIX: 'filmer_',
@@ -59,40 +63,45 @@
       } catch (e) { return null; }
     },
 
-    // Load: prefer cloud, fall back to local. Any failure → local.
+    // Load: prefer cloud, fall back to local. Resolves { data, certain }.
+    // certain=false means a cloud READ FAILED, so the caller must NOT seed
+    // and overwrite — the real data may still be in the cloud.
     load() {
       const self = this;
       return new Promise((resolve) => {
-        if (!self.hasCloud()) return resolve(self.loadLocal());
+        const local = self.loadLocal();
+        // No cloud this session → writes can't reach the cloud, so it's safe.
+        if (!self.hasCloud()) return resolve({ data: local, certain: true });
         try {
           tg.CloudStorage.getItem(self.CLOUD_PREFIX + 'meta', (err, metaRaw) => {
-            if (err || !metaRaw) return resolve(self.loadLocal());
+            if (err) return resolve({ data: local, certain: false });   // read failed
+            if (!metaRaw) return resolve({ data: local, certain: true }); // cloud truly empty
             let meta;
-            try { meta = JSON.parse(metaRaw); } catch (e) { return resolve(self.loadLocal()); }
+            try { meta = JSON.parse(metaRaw); } catch (e) { return resolve({ data: local, certain: false }); }
             const keys = [];
             for (let i = 0; i < meta.chunks; i++) keys.push(self.CLOUD_PREFIX + 'c' + i);
-            if (!keys.length) return resolve(self.loadLocal());
+            if (!keys.length) return resolve({ data: local, certain: true });
             try {
               tg.CloudStorage.getItems(keys, (err2, values) => {
-                if (err2 || !values) return resolve(self.loadLocal());
+                if (err2 || !values) return resolve({ data: local, certain: false });
                 let joined = '';
                 for (let i = 0; i < meta.chunks; i++) joined += values[self.CLOUD_PREFIX + 'c' + i] || '';
                 try {
                   const data = JSON.parse(joined);
                   self.saveLocal(data); // keep local mirror fresh
-                  resolve(data);
-                } catch (e) { resolve(self.loadLocal()); }
+                  resolve({ data: data, certain: true });
+                } catch (e) { resolve({ data: local, certain: false }); }
               });
-            } catch (e) { resolve(self.loadLocal()); }
+            } catch (e) { resolve({ data: local, certain: false }); }
           });
-        } catch (e) { resolve(self.loadLocal()); }
+        } catch (e) { resolve({ data: local, certain: false }); }
       });
     },
 
     // Save: write local immediately, then best-effort cloud sync.
     save(data) {
       this.saveLocal(data);
-      if (!this.hasCloud()) return;
+      if (!this.hasCloud() || !cloudReady) return;
       const str = JSON.stringify(data);
       const chunks = [];
       for (let i = 0; i < str.length; i += this.CHUNK_SIZE) chunks.push(str.slice(i, i + this.CHUNK_SIZE));
@@ -813,24 +822,56 @@
     }
     bindStaticUI();
 
-    Storage.load().then((data) => {
+    Storage.load().then((res) => {
+      const data = res && res.data;
+      cloudReady = !!(res && res.certain); // enable cloud writes only after a safe read
       if (data && Array.isArray(data.categories)) {
-        state = data;
-        // backfill missing fields defensively
-        state.categories.forEach((c) => {
-          if (!c.id) c.id = uid();
-          if (!Array.isArray(c.items)) c.items = [];
-          c.items.forEach((it) => {
-            if (!it.id) it.id = uid();
-            if (typeof it.rating !== 'number') it.rating = 0;
-          });
-        });
-      } else {
+        adoptState(data);
+      } else if (res && res.certain) {
+        // genuinely empty everywhere → first run, safe to seed and save
         state = seed();
         persist();
+      } else {
+        // couldn't read storage reliably — show a seed but DO NOT persist
+        // (so we never overwrite cloud data), and keep retrying the read.
+        state = seed();
+        retryLoad(0);
       }
       render();
     });
+  }
+
+  // Backfill missing fields defensively when adopting loaded data.
+  function adoptState(data) {
+    state = data;
+    state.categories.forEach((c) => {
+      if (!c.id) c.id = uid();
+      if (!Array.isArray(c.items)) c.items = [];
+      c.items.forEach((it) => {
+        if (!it.id) it.id = uid();
+        if (typeof it.rating !== 'number') it.rating = 0;
+      });
+    });
+  }
+
+  // After an unreliable read, retry a few times; if real data turns up,
+  // adopt it. Never seeds/persists over the cloud.
+  function retryLoad(n) {
+    if (n >= 5) return;
+    setTimeout(() => {
+      Storage.load().then((res) => {
+        const data = res && res.data;
+        if (data && Array.isArray(data.categories) && data.categories.length) {
+          cloudReady = !!(res && res.certain);
+          adoptState(data);
+          render();
+        } else if (res && res.certain) {
+          cloudReady = true; // confirmed empty — safe to write from now on
+        } else {
+          retryLoad(n + 1);
+        }
+      });
+    }, 1500 + n * 1500);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
