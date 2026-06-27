@@ -233,28 +233,6 @@ body.modal-open { overflow: hidden; }
 .row:active { background: var(--card-press); transform: scale(0.99); }
 .row.editing:active { transform: none; background: var(--card); }
 
-/* ---------- Add to Home Screen banner (root screen) ---------- */
-.home-add {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin: 0 0 14px;
-  padding: 13px 14px;
-  border-radius: var(--radius);
-  background: rgba(47, 128, 237, 0.08);
-  border: 1px solid rgba(47, 128, 237, 0.18);
-  color: var(--accent);
-  text-align: left;
-  transition: background 0.15s, transform 0.08s;
-  animation: rowIn 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-}
-.home-add:active { background: rgba(47, 128, 237, 0.16); transform: scale(0.99); }
-.home-add-icon { font-size: 18px; line-height: 1; }
-.home-add-text { flex: 1; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
-.home-add-go { display: flex; opacity: 0.6; }
-.home-add-go svg { width: 18px; height: 18px; }
-
 /* edit-mode delete control (red circle with trash) — sits at the right end */
 .cat-delete {
   flex-shrink: 0;

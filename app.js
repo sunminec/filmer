@@ -19,8 +19,6 @@
   // Feature gates — older Telegram clients throw on unsupported methods.
   const canCloud = inTelegram && versionAtLeast('6.9');
   const canBackButton = inTelegram && versionAtLeast('6.1') && tg && tg.BackButton;
-  const canHomeScreen = inTelegram && versionAtLeast('8.0') && tg && typeof tg.addToHomeScreen === 'function';
-  let homeAdded = false; // true once we learn the icon is already on the home screen
 
   /* ---------- Telegram helpers ---------- */
   function haptic(type) {
@@ -252,35 +250,6 @@
     else if (screen.name === 'item') renderItem();
   }
 
-  /* ---------- Add to Home Screen (Bot API 8.0+) ---------- */
-  function homeBannerHTML() {
-    if (!canHomeScreen || homeAdded) return '';
-    return '<button class="home-add" id="homeAddBtn" type="button">' +
-      '<span class="home-add-icon">📌</span>' +
-      '<span class="home-add-text">Add to Home Screen</span>' +
-      '<span class="home-add-go"><svg viewBox="0 0 24 24" width="18" height="18">' +
-      '<path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" ' +
-      'stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
-    '</button>';
-  }
-  function wireHomeAdd() {
-    const b = document.getElementById('homeAddBtn');
-    if (!b) return;
-    b.addEventListener('click', () => {
-      haptic('light');
-      try { tg.addToHomeScreen(); } catch (e) {}
-    });
-  }
-  function refreshHomeScreen() {
-    if (!canHomeScreen || typeof tg.checkHomeScreenStatus !== 'function') return;
-    try {
-      tg.checkHomeScreenStatus((status) => {
-        homeAdded = (status === 'added');
-        if (screen.name === 'categories') renderCategories();
-      });
-    } catch (e) {}
-  }
-
   function renderCategories() {
     const cats = state.categories;
     if (!cats.length) editMode = false; // nothing to edit
@@ -294,12 +263,11 @@
     els.edit.classList.toggle('active', editMode);
 
     if (!cats.length) {
-      els.content.innerHTML = homeBannerHTML() + emptyState('🗂️', 'No sections yet', 'Tap “Add Section” to create your first list — Films, Books, anything.');
-      wireHomeAdd();
+      els.content.innerHTML = emptyState('🗂️', 'No sections yet', 'Tap “Add Section” to create your first list — Films, Books, anything.');
       return;
     }
 
-    let h = homeBannerHTML() + '<div class="list">';
+    let h = '<div class="list">';
     for (const c of cats) {
       const n = c.items.length;
       if (editMode) {
@@ -332,7 +300,6 @@
         el.addEventListener('click', () => { haptic('light'); goCategory(el.dataset.cat); });
       });
     }
-    wireHomeAdd();
   }
 
   function renderCategory() {
@@ -758,14 +725,6 @@
         if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
       } catch (e) {}
     }
-    if (canHomeScreen && typeof tg.onEvent === 'function') {
-      try {
-        tg.onEvent('homeScreenAdded', () => {
-          homeAdded = true;
-          if (screen.name === 'categories') renderCategories();
-        });
-      } catch (e) {}
-    }
     bindStaticUI();
 
     Storage.load().then((data) => {
@@ -785,7 +744,6 @@
         persist();
       }
       render();
-      refreshHomeScreen();
     });
   }
 
